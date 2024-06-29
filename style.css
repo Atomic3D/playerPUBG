@@ -1,0 +1,29 @@
+body {
+  background-color: white;
+}
+
+canvas {
+  display: block;
+  position: absolute;
+  z-index: 1;
+  border: 2px solid red;
+}
+
+.slider {
+  z-index: 2;
+  top: 850px;
+  left: 20px;
+  float: left;
+  width: 300px;
+}
+
+.radioButtons {
+  z-index: 2;
+  top: 850px;
+  float: left;
+  left: 100px;
+}
+
+.box {
+  position: relative;
+}

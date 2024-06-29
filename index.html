@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PUBG Player</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div>
+      <form>
+        <label for="playerNameLabel">Имя игрока:</label>
+        <input type="text" id="playerName" name="playerName" />
+        <label for="platform">Платформа:</label>
+        <select id="platform" name="platform">
+          <option value="steam">Steam</option>
+          <option value="xbox">XBox</option>
+          <option value="console">Console</option>
+        </select>
+        <select id="match" name="match"></select>
+        <button onclick="searchPlayer()">Найти игрока</button>
+      </form>
+    </div>
+    <!-- <div>
+      <button onclick="loadAndDrawImage()">
+        Загрузить и нарисовать изображение
+      </button>
+    </div> -->
+    <div class="canvasPlayer" id="canvasPlayer">
+      <!-- <canvas id="mapCanvas" width="819" height="819"></canvas> -->
+      <!-- <canvas id="playerCanvas" width="819" height="819"></canvas>
+      <canvas id="deathCanvas" width="819" height="819"></canvas> -->
+    </div>
+    <div class="container wrap">
+      <div class="box slider">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value="0"
+          class="slider"
+          id="timeSlider"
+        />
+        <p>Прокрутка времени: <span id="currentTime">0</span></p>
+      </div>
+      <div class="box radioButtons">
+        <button id="playButton">Play</button>
+        <button id="stopButton">Stop</button>
+        <input type="radio" id="1x" name="speed" value="1" checked />
+        <label for="1x">1x</label>
+        <input type="radio" id="2.5x" name="speed" value="2.5" />
+        <label for="2.5x">2.5x</label>
+        <input type="radio" id="5x" name="speed" value="5" />
+        <label for="5x">5x</label>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
