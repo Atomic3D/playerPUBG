@@ -671,19 +671,19 @@ document.addEventListener("DOMContentLoaded", async function () {
   // camera.rotateZ(Math.PI);
 
   const wheelTexture = loader.load(
-    // "D:/Denis/Programming/JS/wheel.png"
-    "M:/NextJS/playerPUBG/public/picture/wheel.png"
+    // "wheel.png"
+    "public/picture/wheel.png"
   );
   const crossTexture = loader.load(
-    // "D:/Denis/Programming/JS/death.png"
-    // "D:/Denis/Programming/JS/cross.png"
-    "M:/NextJS/playerPUBG/public/picture/cross0.png"
-    // "M:/NextJS/playerPUBG/public/picture/death.png"
-    // "M:/NextJS/playerPUBG/public/picture/skull.png"
+    // "death.png"
+    // "cross.png"
+    "public/picture/cross0.png"
+    // "public/picture/death.png"
+    // "public/picture/skull.png"
   );
   const carePackageTexture = loader.load(
-    // "D:/Denis/Programming/JS/carepackage.png"
-    "M:/NextJS/playerPUBG/public/picture/carepackage.png"
+    // "carepackage.png"
+    "public/picture/carepackage.png"
   );
 
   // Создаем геометрию и материал для плоскости
@@ -926,15 +926,6 @@ document.addEventListener("DOMContentLoaded", async function () {
   stopButton.addEventListener("click", function () {
     shouldContinue = false;
   });
-
-  function drawLine(ctx, startX, startY, endX, endY) {
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
 
   function playerTakeDamage(time) {
     const childName = "shootLine2";
