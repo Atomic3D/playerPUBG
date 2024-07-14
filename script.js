@@ -8,25 +8,253 @@ const fetchData = async (url) => {
     console.error("Ошибка при загрузке данных:", error);
   }
 };
-
 const loader = new THREE.TextureLoader();
+// let targetTeamId;
+//========================================================
+async function getPlayerData(platform, playerId, apiKey) {
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    Accept: "application/vnd.api+json",
+  };
+  try {
+    const response = await fetch(
+      `https://api.pubg.com/shards/${platform}/players?filter[playerNames]=${playerId}`,
+      {
+        method: "GET",
+        headers: headers,
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP error status: ${response.status}`);
+    }
+    const data = await response.json();
+    const matchIds = data.data[0].relationships.matches.data.map(
+      (match) => match.id
+    );
 
-document.addEventListener("DOMContentLoaded", async function () {
-  let playerName = document.getElementById("playerName").value;
-  // const mapCanvas = document.getElementById("mapCanvas");
-  // const mapCtx = mapCanvas.getContext("2d");
-  const playerCanvas = document.getElementById("playerCanvas");
-  // const playerCtx = playerCanvas.getContext("2d");
+    const matchesInfo = [];
+    for (const matchId of matchIds) {
+      const response = await fetch(
+        `https://api.pubg.com/shards/${platform}/matches/${matchId}`,
+        {
+          method: "GET",
+          headers: headers,
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error status: ${response.status}`);
+      }
+      const matchData = await response.json();
+      const assets = matchData.included
+        .filter((item) => item.type === "asset")
+        .map((asset) => ({
+          url: asset.attributes.URL,
+          gameMode: matchData.data.attributes.gameMode,
+          matchType: matchData.data.attributes.matchType,
+          duration: matchData.data.attributes.duration,
+          mapName: matchData.data.attributes.mapName,
+        }));
+
+      matchesInfo.push(...assets);
+    }
+    return matchesInfo;
+  } catch (error) {
+    console.error("Error fetching player data:", error);
+  }
+}
+//========================================================
+const gameModeValue = {
+  duo: "Duo TPP",
+  "duo-fpp": "Duo FPP",
+  solo: "Solo TPP",
+  "solo-fpp": "Solo FPP",
+  squad: "Squad TPP",
+  "squad-fpp": "Squad FPP",
+  "conquest-duo": "Conquest Duo TPP",
+  "conquest-duo-fpp": "Conquest Duo FPP",
+  "conquest-solo": "Conquest Solo TPP",
+  "conquest-solo-fpp": "Conquest Solo FPP",
+  "conquest-squad": "Conquest Squad TPP",
+  "conquest-squad-fpp": "Conquest Squad FPP",
+  "esports-duo": "Esports Duo TPP",
+  "esports-duo-fpp": "Esports Duo FPP",
+  "esports-solo": "Esports Solo TPP",
+  "esports-solo-fpp": "Esports Solo FPP",
+  "esports-squad": "Esports Squad TPP",
+  "esports-squad-fpp": "Esports Squad FPP",
+  "normal-duo": "Duo TPP",
+  "normal-duo-fpp": "Duo FPP",
+  "normal-solo": "Solo TPP",
+  "normal-solo-fpp": "Solo FPP",
+  "normal-squad": "Squad TPP",
+  "normal-squad-fpp": "Squad FPP",
+  "war-duo": "War Duo TPP",
+  "war-duo-fpp": "War Duo FPP",
+  "war-solo": "War Solo TPP",
+  "war-solo-fpp": "War Solo FPP",
+  "war-squad": "Squad TPP",
+  "war-squad-fpp": "War Squad FPP",
+  "zombie-duo": "Zombie Duo TPP",
+  "zombie-duo-fpp": "Zombie Duo FPP",
+  "zombie-solo": "Zombie Solo TPP",
+  "zombie-solo-fpp": "Zombie Solo FPP",
+  "zombie-squad": "Zombie Squad TPP",
+  "zombie-squad-fpp": "Zombie Squad FPP",
+  "lab-tpp": "Lab TPP",
+  "lab-fpp": "Lab FPP",
+  tdm: "Team Deathmatch",
+};
+const gameMapsName = {
+  Baltic_Main: "Erangel",
+  Erangel_Main: "Erangel",
+  Chimera_Main: "Paramo",
+  Desert_Main: "Miramar",
+  DihorOtok_Main: "Vikendi",
+  Heaven_Main: "Heaven",
+  Kiki_Main: "Deston",
+  Range_Main: "Camp Jackal",
+  Savage_Main: "Sanhok",
+  Summerland_Main: "Karakin",
+  Tiger_Main: "Taego",
+  Neon_Main: "Rondo",
+};
+//========================================================
+async function processJsonFiles(platform, playerId, apiKey) {
+  const matchStartArray = [];
+  const matchesInfo = await getPlayerData(platform, playerId, apiKey);
+  try {
+    for (let i = 0; i <= 9; i++) {
+      const matchInfo = matchesInfo[i];
+      const data = await fetchData(matchInfo.url);
+      let mapName = matchInfo.mapName;
+      let gameMapName = gameMapsName[mapName];
+      let gameMode = matchInfo.gameMode;
+      let gameModePlayer = gameModeValue[gameMode];
+      // let characters = [];
+      // let teamSize;
+      // let ranking;
+      let characterRanking;
+      // let matchCharactersStart = [];
+      let matchCharactersEnd = [];
+      let logPlayerCreateArray = [];
+      let playersInSameTeam;
+      // let targetTeamId;
+
+      data.forEach((item) => {
+        if (item && item._T === "LogPlayerCreate") {
+          const character = item.character;
+          logPlayerCreateArray.push({ character });
+        }
+        // logPlayerCreateArray.forEach((player) => {
+        //   if (player.character.name == playerId) {
+        //     targetTeamId = player.character.teamId;
+        //   }
+        // });
+        // if (targetTeamId) {
+        //   // Фильтруем игроков, принадлежащих той же команде
+        //   playersInSameTeam = logPlayerCreateArray.filter(
+        //     (player) => player.character.teamId === targetTeamId
+        //   );
+        // } else {
+        //   console.log("Игрок с указанным именем не найден");
+        // }
+
+        const targetPlayer = logPlayerCreateArray.find(
+          (player) => player.character.name === playerId
+        );
+        if (!targetPlayer) {
+          // console.log("Игрок с указанным именем не найден");
+          return;
+        }
+        const targetTeamId = targetPlayer.character.teamId;
+        playersInSameTeam = logPlayerCreateArray.filter(
+          (player) => player.character.teamId === targetTeamId
+        );
+
+        if (item._T === "LogMatchEnd") {
+          matchCharactersEnd = item.characters;
+          let foundRanking = false; // Флаг для отслеживания наличия ранга
+          matchCharactersEnd.forEach((character) => {
+            if (character.character.teamId === targetTeamId) {
+              characterRanking = character.character.ranking;
+              foundRanking = true; // Установка флага в true при нахождении ранга
+            }
+          });
+          if (foundRanking) {
+            const formattedString = `${gameMapName} - ${gameModePlayer} - ${characterRanking}/${matchCharactersEnd.length}`;
+            matchStartArray.push(formattedString);
+          }
+        }
+      });
+    }
+  } catch (error) {
+    console.error(`Error processing file at ${url}:`, error);
+  }
+  return matchStartArray;
+}
+//========================================================
+const platform = document.getElementById("platform").value;
+let playerName = document.getElementById("playerName");
+const match = document.getElementById("match");
+const searchMapsButtonId = document.getElementById("searchMapsButtonId");
+const loadMapId = document.getElementById("loadMapId");
+let data, dataArray, selectedUrl; // Переменная для хранения загруженных данных JSON
+//========================================================
+searchMapsButtonId.addEventListener("click", async function () {
+  playerName = playerName.value;
+  while (match.firstChild) {
+    match.removeChild(match.firstChild);
+  }
+  try {
+    let processJsonFilesArray = await processJsonFiles(
+      platform,
+      playerName,
+      apiKey
+    );
+    let playerData = await getPlayerData(platform, playerName, apiKey);
+
+    processJsonFilesArray.forEach((data) => {
+      let option = document.createElement("option");
+      option.value = playerData.url;
+      option.text = data;
+      match.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Произошла ошибка:", error);
+  }
+});
+//========================================================
+loadMapId.disabled = true;
+//========================================================
+match.addEventListener("change", async (event) => {
+  const platform = document.getElementById("platform").value;
+  const playerName = document.getElementById("playerName").value;
+
+  const playerData = await getPlayerData(platform, playerName, apiKey);
+  const selectedIndex = event.target.selectedIndex;
+  if (playerData && selectedIndex >= 0 && selectedIndex < playerData.length) {
+    selectedUrl = playerData[selectedIndex].url;
+    console.log(selectedUrl);
+    // console.log(playerData[selectedIndex].gameMode);
+    if (selectedUrl) {
+      loadMapId.disabled = false;
+    }
+    return selectedUrl;
+  } else {
+    console.error("playerData не определено или выбран неверный индекс");
+  }
+});
+//========================================================
+loadMapId.addEventListener("click", async function () {
+  data = await fetchData(selectedUrl);
+  loadMapId.disabled = true;
   const timeSlider = document.getElementById("timeSlider");
   const currentTimeText = document.getElementById("currentTime");
-  const playerNameInput = document.getElementById("playerName");
-  const platform = document.getElementById("platform");
-  const match = document.getElementById("match");
   const playButton = document.getElementById("playButton");
   const stopButton = document.getElementById("stopButton");
   const canvasPlayer = document.getElementById("canvasPlayer");
-  // const canvasPlayer = document.getElementsByClassName("canvasPlayer");
-  const canvasPlayerDiv = document.querySelector(".canvasPlayer");
+
+  timeSlider.value = 0;
 
   let startTime, endTime;
   let startTimeMatch, endTimeMatch;
@@ -39,22 +267,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   let divider;
   let matchTime = [];
   let minTime, maxTime;
-  let data; // Переменная для хранения загруженных данных JSON
-  try {
-    data = await fetchData(
-      // "https://telemetry-cdn.pubg.com/bluehole-pubg/steam/2024/06/11/16/16/f087fa15-280d-11ef-b494-7ab82fa5e467-telemetry.json"
-      // "https://telemetry-cdn.pubg.com/bluehole-pubg/steam/2024/06/19/16/28/f400189f-2e58-11ef-8e53-52efdb7423b0-telemetry.json"
-      // "https://telemetry-cdn.pubg.com/bluehole-pubg/steam/2024/06/23/15/42/3b56d623-3177-11ef-a6eb-0ecd5821fde8-telemetry.json"
-      "https://telemetry-cdn.pubg.com/bluehole-pubg/steam/2024/06/25/16/40/abea74c1-3311-11ef-9440-4eb6a2a5c7ee-telemetry.json"
-      // "https://telemetry-cdn.pubg.com/bluehole-pubg/steam/2024/06/27/16/45/a56992ca-34a4-11ef-9799-eae35b87f06c-telemetry.json"
-    );
-  } catch (error) {
-    console.error("Ошибка при загрузке данных:", error);
-  }
 
   data.forEach((item) => {
     const date = new Date(item._D);
-    // console.log(date);
     if (!startTime || date < startTime) {
       startTime = date.getTime();
     }
@@ -77,11 +292,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   timeSlider.step = 1000; // Шаг в миллисекундах
   // timeSlider.min = minTime; // Преобразование в миллисекунды
   // timeSlider.max = maxTime;
-  // timeSlider.step = 1; // Шаг в миллисекундах
+  // timeSlider.step = 1; // Шаг в секундах
 
   let timeDelay = 5000;
   let teams = {};
-  let teamId = "";
   let logPlayerCreateArray = [];
   let logPlayerPositionArray = [];
   let gameStateDataArray = [];
@@ -131,7 +345,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         eventTimeGet,
       });
     }
-    // console.log(teams);
     if (i && i._T === "LogMatchEnd") {
       const eventTime = new Date(i._D);
       const eventTimeGet = eventTime.getTime();
@@ -394,6 +607,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       });
     }
   });
+  //========================================================
   logPlayerCreateArray.forEach((player) => {
     // Получение teamId текущего персонажа
     let teamId = player.character.teamId;
@@ -405,6 +619,23 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Добавляем персонажа в список команды
     teams[teamId].push(player.character);
   });
+  //========================================================
+  let targetTeamId;
+  let playersInSameTeam;
+  logPlayerCreateArray.forEach((player) => {
+    if (player.character.name == playerName) {
+      targetTeamId = player.character.teamId;
+    }
+  });
+  if (targetTeamId) {
+    // Фильтруем игроков, принадлежащих той же команде
+    playersInSameTeam = logPlayerCreateArray.filter(
+      (player) => player.character.teamId === targetTeamId
+    );
+  } else {
+    console.log("Игрок с указанным именем не найден");
+  }
+  //========================================================
   logVehicleLeaveArray.forEach((player) => {
     if (
       player.vehicle.vehicleType === "TransportAircraft" &&
@@ -416,187 +647,103 @@ document.addEventListener("DOMContentLoaded", async function () {
   //========================================================
   let matchStartMapName = logMatchStartArray[0].mapName;
   let mapTexture;
-  if (
-    matchStartMapName === "Baltic_Main" ||
-    matchStartMapName === "Erangel_Main"
-  ) {
-    mapName = "Erangel";
-    mapTexture = loader.load("public/map/map_Baltic_Main.png");
-    divider = 1000;
-  }
-  if (matchStartMapName === "Chimera_Main") {
-    mapName = "Paramo";
-    mapTexture = loader.load("public/map/map_Chimera_Main.png");
-    divider = 375;
-  }
-  if (matchStartMapName === "Desert_Main") {
-    mapName = "Miramar";
-    mapTexture = loader.load(
-      // "Miramar_Main_Low_Res.png"
-      "public/map/map_Desert_Main.png"
-    );
-    divider = 1000;
-  }
-  if (matchStartMapName === "DihorOtok_Main") {
-    mapName = "Vikendi";
-    mapTexture = loader.load("public/map/map_DihorOtok_Main.png");
-    divider = 1000;
-  }
-  if (matchStartMapName === "Heaven_Main") {
-    mapName = "Heaven";
-    mapTexture = loader.load("public/map/map_Heaven_Main.png");
-    divider = 125;
-  }
-  if (matchStartMapName === "Kiki_Main") {
-    mapName = "Deston";
-    mapTexture = loader.load("public/map/map_Kiki_Main.png");
-    divider = 1000;
-  }
-  if (matchStartMapName === "Range_Main") {
-    mapName = "Camp Jackal";
-    mapTexture = loader.load("public/map/map_Range_Main.png");
-    divider = 250;
-  }
-  if (matchStartMapName === "Savage_Main") {
-    mapName = "Sanhok";
-    mapTexture = loader.load("public/map/map_Savage_Main.png");
-    divider = 500;
-  }
-  if (matchStartMapName === "Summerland_Main") {
-    mapName = "Karakin";
-    mapTexture = loader.load("public/map/map_Summerland_Main.png");
-    divider = 250;
-  }
-  if (matchStartMapName === "Tiger_Main") {
-    mapName = "Taego";
-    mapTexture = loader.load("public/map/map_Tiger_Main.png");
-    divider = 1000;
-  }
-  if (matchStartMapName === "Neon_Main") {
-    mapName = "Rondo";
-    mapTexture = loader.load("public/map/map_Neon_Main.png");
-    divider = 1000;
+  let mapName;
+  switch (matchStartMapName) {
+    case "Baltic_Main":
+    case "Erangel_Main":
+      mapName = "Erangel";
+      mapTexture = loader.load("public/map/map_Baltic_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Erangel_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    case "Chimera_Main":
+      mapName = "Paramo";
+      mapTexture = loader.load("public/map/map_Chimera_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Paramo_Main_Low_Res.png"
+      // );
+      divider = 375;
+      break;
+    case "Desert_Main":
+      mapName = "Miramar";
+      mapTexture = loader.load("public/map/map_Desert_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Miramar_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    case "DihorOtok_Main":
+      mapName = "Vikendi";
+      mapTexture = loader.load("public/map/map_DihorOtok_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Vikendi_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    case "Heaven_Main":
+      mapName = "Heaven";
+      mapTexture = loader.load("public/map/map_Heaven_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Haven_Main_Low_Res.png"
+      // );
+      divider = 125;
+      break;
+    case "Kiki_Main":
+      mapName = "Deston";
+      mapTexture = loader.load("public/map/map_Kiki_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Deston_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    case "Range_Main":
+      mapName = "Camp Jackal";
+      mapTexture = loader.load("public/map/map_Range_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Camp_Jackal_Main_Low_Res.png"
+      // );
+      divider = 250;
+      break;
+    case "Savage_Main":
+      mapName = "Sanhok";
+      mapTexture = loader.load("public/map/map_Savage_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Sanhok_Main_Low_Res.png"
+      // );
+      divider = 500;
+      break;
+    case "Summerland_Main":
+      mapName = "Karakin";
+      mapTexture = loader.load("public/map/map_Summerland_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Karakin_Main_Low_Res.png"
+      // );
+      divider = 250;
+      break;
+    case "Tiger_Main":
+      mapName = "Taego";
+      mapTexture = loader.load("public/map/map_Tiger_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Taego_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    case "Neon_Main":
+      mapName = "Rondo";
+      mapTexture = loader.load("public/map/map_Neon_Main.png");
+      // mapTexture = loader.load(
+      //   "https://github.com/pubg/api-assets/blob/master/Assets/Maps/Rondo_Main_Low_Res.png"
+      // );
+      divider = 1000;
+      break;
+    default:
+      mapName = "Default";
+      divider = 1000;
+      break;
   }
   //========================================================
-  // console.log(logMatchStartArray);
-  // console.log(gameStateDataArray);
-  // console.log(logVehicleRideArray);
-  // console.log(logVehicleLeaveArray);
-  // console.log(logVehicleLeaveArrayArray);
-  // console.log(logPlayerCreateArray);
-  // console.log(teams);
-  console.log("logPlayerAttackArray", logPlayerAttackArray.length);
-  console.log("logPlayerKillV2Array", logPlayerKillV2Array.length);
-  // console.log("logPlayerMakeGroggyArray", logPlayerMakeGroggyArray.length);
-  // console.log("logPlayerTakeDamageArray", logPlayerTakeDamageArray.length);
-  // console.log(logMatchStartArray[0].characters.length);
-  // console.log(logCarePackageLandArray);
-  // console.log(logCarePackageSpawnArray);
-  // console.log(logItemPickupFromCarepackageArray);
-
-  // COLORS = [
-  //   "#942B6C",
-  //   "#A6D2F5",
-  //   "#5BCB89",
-  //   "#CD3537",
-  //   "#7A0E2A",
-  //   "#62AA3E",
-  //   "#C42159",
-  //   "#CE8958",
-  //   "#8A3ED5",
-  //   "#5FC9CB",
-  //   "#205541",
-  //   "#AD2E5B",
-  //   "#F979E2",
-  //   "#9E61C4",
-  //   "#1683A6",
-  //   "#3AFBA7",
-  //   "#1AA357",
-  //   "#5D8893",
-  //   "#F89E56",
-  //   "#47C523",
-  //   "#9EEB36",
-  //   "#D11FCE",
-  //   "#38363D",
-  //   "#C1323A",
-  //   "#71EB85",
-  //   "#2DD25B",
-  //   "#E95B80",
-  //   "#0A1A06",
-  //   "#814817",
-  //   "#B4B36E",
-  //   "#EAA302",
-  //   "#F5B592",
-  //   "#B55B73",
-  //   "#BE15AA",
-  //   "#ACD985",
-  //   "#72B3DC",
-  //   "#89FE43",
-  //   "#A811FD",
-  //   "#70A2F1",
-  //   "#664298",
-  //   "#4EC808",
-  //   "#BD0FB4",
-  //   "#2504EF",
-  //   "#BDB408",
-  //   "#3C4403",
-  //   "#745AEB",
-  //   "#9EDF2E",
-  //   "#496124",
-  //   "#7191A3",
-  //   "#956960",
-  //   "#EE2873",
-  //   "#BD42F2",
-  //   "#38DB60",
-  //   "#50B3FF",
-  //   "#DF9413",
-  //   "#A563B8",
-  //   "#448ECC",
-  //   "#C71859",
-  //   "#2B7126",
-  //   "#791C85",
-  //   "#02C483",
-  //   "#2BB2B5",
-  //   "#19961B",
-  //   "#8D3E9E",
-  //   "#DDF0EE",
-  //   "#3FF44A",
-  //   "#4AAACD",
-  //   "#D5B3CA",
-  //   "#FE5D3C",
-  //   "#A5EA3E",
-  //   "#B6E779",
-  //   "#C88575",
-  //   "#8449EA",
-  //   "#FDEE02",
-  //   "#8CA755",
-  //   "#1025CF",
-  //   "#D15138",
-  //   "#00E067",
-  //   "#D3B254",
-  //   "#FE716A",
-  //   "#5B0D71",
-  //   "#A87B02",
-  //   "#1EBB55",
-  //   "#6859E3",
-  //   "#0D40CF",
-  //   "#1AA5D4",
-  //   "#B843F4",
-  //   "#0D35E0",
-  //   "#571A51",
-  //   "#1B4606",
-  //   "#4359F8",
-  //   "#A8E9F3",
-  //   "#1DFACF",
-  //   "#D726DD",
-  //   "#A5529E",
-  //   "#AD6E63",
-  //   "#CD9B91",
-  //   "#3C734F",
-  //   "#6B5360",
-  //   "#19EB15",
-  // ];
-
   function randomColors() {
     const colors = [];
     for (let i = 0; i <= 99; i++) {
@@ -615,6 +762,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     return "#" + paddedRed + paddedGreen + paddedBlue;
   }
+  //========================================================
   let currentColorIndex = 0; // Индекс для следования по массиву COLORS
   const COLORS = randomColors();
 
@@ -629,7 +777,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Инициализация Three.js
   const scene = new THREE.Scene();
-  // scene.background = "black";
   const renderer = new THREE.WebGLRenderer({
     alpha: true,
   });
@@ -644,48 +791,20 @@ document.addEventListener("DOMContentLoaded", async function () {
     targetDomElement.id = "playerCanvas";
   }
 
+  //========================================================
   const camera = new THREE.OrthographicCamera(
-    0,
-    canvasWidth,
-    canvasHeight,
-    0,
+    canvasWidth / -2,
+    canvasWidth / 2,
+    canvasHeight / 2,
+    canvasHeight / -2,
     -1000,
     2000
   );
-  // const camera = new THREE.OrthographicCamera(
-  //   canvasWidth / -2,
-  //   canvasWidth / 2,
-  //   canvasHeight / 2,
-  //   canvasHeight / -2,
-  //   -1000,
-  //   2000
-  // );
-  // camera.position.set(0, 0, -1);
-  // camera.position.z *= -1; // Изменяем знак координаты z
+  camera.position.set(0, 0, -1);
   camera.lookAt(0, 0, 1);
-  // camera.lookAt(canvasWidth / 2, canvasHeight / 2, 1);
   camera.rotateZ(Math.PI);
-  camera.position.set(-canvasWidth / 2, canvasHeight / 2, -1);
-  // camera.position.z *= -1; // Изменяем знак координаты z
-  // camera.lookAt(canvasWidth / 2, canvasHeight / 2, 0);
-  // camera.rotateZ(Math.PI);
-
-  const wheelTexture = loader.load(
-    // "wheel.png"
-    "public/picture/wheel.png"
-  );
-  const crossTexture = loader.load(
-    // "death.png"
-    // "cross.png"
-    "public/picture/cross0.png"
-    // "public/picture/death.png"
-    // "public/picture/skull.png"
-  );
-  const carePackageTexture = loader.load(
-    // "carepackage.png"
-    "public/picture/carepackage.png"
-  );
-
+  //========================================================
+  const wheelTexture = loader.load("public/picture/wheel.png");
   // Создаем геометрию и материал для плоскости
   let planeGeometry = new THREE.PlaneGeometry(canvasWidth, canvasHeight);
   let planeMaterial = new THREE.MeshBasicMaterial({
@@ -696,8 +815,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   plane.lookAt(0, 0, -1);
   plane.rotateZ(Math.PI);
   scene.add(plane);
-
-  // =================================
+  //========================================================
   // Функция для изменения уровня "zoom"
   let currentScale = 1; // Начальный масштаб
   //=========================================
@@ -784,7 +902,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     scene.add(line);
     renderer.render(scene, camera);
   }
-
+  //========================================================
   function changeZoom(delta, mouseX, mouseY) {
     currentScale *= delta;
 
@@ -831,7 +949,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   function renderScene() {
     renderer.render(scene, camera);
   }
-  // ========================================================================
+  //========================================================
   // Обработчик событияMouseMove для изменения масштаба под курсором мыши
   let lastMouseX = null;
   let lastMouseY = null;
@@ -853,10 +971,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     lastMouseY = mouseY;
   }
 
-  // // Добавляем обработчик события
+  // Добавляем обработчик события
   // canvasPlayer[0].addEventListener("wheel", onWheel, { passive: false });
-  // ========================================================================
-
+  // =======================================================
   function generateSequence(start, end, step) {
     let sequence = [];
     for (let i = start; i <= end; i += step) {
@@ -864,17 +981,17 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     return sequence;
   }
-
-  let numbers = generateSequence(startTime, endTime, timeDelay);
-
-  timeSlider.oninput = function () {
+  //========================================================
+  let numbers = generateSequence(startTime, endTime, timeDelay / 5);
+  //========================================================
+  timeSlider.addEventListener("input", function () {
     const time = this.valueAsNumber;
     // console.log("-----");
     console.log(time);
     const timeInSeconds = time / 1000 - startTime / 1000;
 
     drawFlyingLine();
-    updatePlayerPositions(time);
+    drawPlayersPositions(time);
     drawZones(time);
     playerTakeDamage(time);
     playerDeath(time);
@@ -888,15 +1005,15 @@ document.addEventListener("DOMContentLoaded", async function () {
       .padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds
       .toString()
       .padStart(2, "0")}`;
-  };
-
+  });
+  //========================================================
   let index = 0; // Индекс для перебора массива numbers
   let shouldContinue = true; // Флаг для контроля выполнения
 
   function nextTime() {
     if (shouldContinue && index < numbers.length) {
       const time = numbers[index];
-      updatePlayerPositions(time);
+      drawPlayersPositions(time);
       drawZones(time);
       playerTakeDamage(time);
       playerDeath(time);
@@ -916,19 +1033,17 @@ document.addEventListener("DOMContentLoaded", async function () {
       index++;
     }
   }
-
+  //========================================================
   playButton.addEventListener("click", function () {
     shouldContinue = true;
-    // index = lastIndex;
-    // startTimePlayer = lastStartTime;
     nextTime();
   });
   stopButton.addEventListener("click", function () {
     shouldContinue = false;
   });
-
+  //========================================================
   function playerTakeDamage(time) {
-    const childName = "shootLine2";
+    const childName = "shootLine";
     // Получаем все дочерние объекты сцены
     const allChildren = scene.children;
     // Проходим по всем дочерним объектам
@@ -957,9 +1072,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         event.victim.location.y,
         event.victim.location.z
       );
-      const points = [pointsKiller, pointsVictim];
-      // points.push(pointsKiller);
-      // points.push(pointsVictim);
+      // const points = [pointsKiller, pointsVictim];
+      const points = [];
+      points.push(pointsKiller);
+      points.push(pointsVictim);
 
       const scaledPoints = points.map((point) => ({
         x: point.x / divider,
@@ -979,20 +1095,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
     renderer.render(scene, camera);
   }
-
+  //========================================================
   function playerDeath(time) {
-    // Получаем все дочерние объекты сцены
-    // const allChildren = scene.children;
-    const childName = "playerDeath";
-    // Проходим по всем дочерним объектам
-    // for (let i = allChildren.length - 1; i >= 0; i--) {
-    //   const child = allChildren[i];
-    //   // Проверяем, имеет ли дочерний объект имя
-    //   if (child.name === childName) {
-    //     // Удаляем дочерний объект из сцены
-    //     scene.remove(child);
-    //   }
-    // }
+    const childName1 = "playerDeath_1";
+    const childName2 = "playerDeath_2";
+
     const filteredEvents = logPlayerKillV2Array.filter(
       (event) => Math.abs(event.eventTimeGet - time) <= timeDelay
     );
@@ -1002,39 +1109,61 @@ document.addEventListener("DOMContentLoaded", async function () {
         const teamId = victim.teamId;
         const startX = event.victim.location.x / divider;
         const startY = event.victim.location.y / divider;
-        let planeGeometry = new THREE.PlaneGeometry(
-          crossTexture.image.width,
-          crossTexture.image.height
-        );
-        let planeMaterial = new THREE.MeshBasicMaterial({
-          map: crossTexture,
+
+        const x = 0,
+          y = 0; // Начальная точка
+        const crossShape = new THREE.Shape();
+        const crossWidth = 5,
+          crossHeight = 5;
+        crossShape.moveTo(x, y - crossHeight / 2);
+        crossShape.lineTo(x + crossWidth / 2, y - crossHeight);
+        crossShape.lineTo(x + crossWidth, y - crossHeight / 2);
+        crossShape.lineTo(x + crossWidth / 2, y);
+        crossShape.lineTo(x + crossWidth, y + crossHeight / 2);
+        crossShape.lineTo(x + crossWidth / 2, y + crossHeight);
+        crossShape.lineTo(x, y + crossHeight / 2);
+        crossShape.lineTo(x - crossWidth / 2, y + crossHeight);
+        crossShape.lineTo(x - crossWidth, y - crossHeight / 2);
+        crossShape.lineTo(x - crossWidth / 2, y);
+        crossShape.lineTo(x - crossWidth, y - crossHeight / 2);
+        crossShape.lineTo(x - crossWidth / 2, y - crossHeight);
+        crossShape.lineTo(x, y - crossHeight / 2);
+        crossShape.closePath(); // Закрытие формы
+        const crossGeometry = new THREE.ShapeGeometry(crossShape);
+        const crossMaterial = new THREE.MeshBasicMaterial({
           color: teams[teamId].color,
           side: THREE.DoubleSide,
         });
-        let plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.name = childName;
-        plane.lookAt(0, 0, -1);
-        plane.rotateZ(Math.PI);
-        scene.add(plane);
-        plane.position.set(startX - canvasWidth / 2, startY - canvasHeight / 2);
+        const crossMesh = new THREE.Mesh(crossGeometry, crossMaterial);
+
+        const outlineMaterial = new THREE.LineBasicMaterial({
+          color: "black",
+          linewidth: 2,
+          side: THREE.DoubleSide,
+        });
+        const outlineGeometry = new THREE.EdgesGeometry(crossGeometry);
+        const outlineMesh = new THREE.LineSegments(
+          outlineGeometry,
+          outlineMaterial
+        );
+
+        const cross = new THREE.Group();
+        cross.add(outlineMesh);
+        cross.add(crossMesh);
+        cross.name = childName1;
+        cross.lookAt(0, 0, -1);
+        cross.rotateZ(Math.PI);
+        scene.add(cross);
+        cross.position.set(startX - canvasWidth / 2, startY - canvasHeight / 2);
       }
     });
     renderer.render(scene, camera);
   }
-
+  //========================================================
   function carePackage(time) {
-    // Получаем все дочерние объекты сцены
-    // const allChildren = scene.children;
-    const childName = "carePackage";
-    // Проходим по всем дочерним объектам
-    // for (let i = allChildren.length - 1; i >= 0; i--) {
-    //   const child = allChildren[i];
-    //   // Проверяем, имеет ли дочерний объект имя
-    //   if (child.name === childName) {
-    //     // Удаляем дочерний объект из сцены
-    //     scene.remove(child);
-    //   }
-    // }
+    const childName1 = "carePackage_1";
+    const childName2 = "carePackage_2";
+
     const filteredEvents = logCarePackageLandArray.filter(
       (event) => Math.abs(event.eventTimeGet - time) <= timeDelay
     );
@@ -1043,25 +1172,83 @@ document.addEventListener("DOMContentLoaded", async function () {
       if (itemPackage) {
         const startX = event.itemPackage.location.x / divider;
         const startY = event.itemPackage.location.y / divider;
-        let planeGeometry = new THREE.PlaneGeometry(
-          carePackageTexture.image.width,
-          carePackageTexture.image.height
-        );
-        let planeMaterial = new THREE.MeshBasicMaterial({
-          map: carePackageTexture,
+
+        const x = 0,
+          y = 0; // Начальная точка
+        const carePackageShape1 = new THREE.Shape();
+        carePackageShape1.moveTo(x + 0, y + 0);
+        carePackageShape1.lineTo(x + 5, y + 0);
+        carePackageShape1.lineTo(x + 5, y - 4);
+        carePackageShape1.lineTo(x - 5, y - 4);
+        carePackageShape1.lineTo(x - 5, y + 0);
+        carePackageShape1.lineTo(x + 0, y + 0);
+        carePackageShape1.closePath(); // Закрытие формы
+        const carePackageGeometry1 = new THREE.ShapeGeometry(carePackageShape1);
+        const carePackageMaterial1 = new THREE.MeshBasicMaterial({
+          color: "red",
           side: THREE.DoubleSide,
         });
-        let plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.name = childName;
-        plane.lookAt(0, 0, -1);
-        plane.rotateZ(Math.PI);
-        scene.add(plane);
-        plane.position.set(startX - canvasWidth / 2, startY - canvasHeight / 2);
+        const carePackageMesh1 = new THREE.Mesh(
+          carePackageGeometry1,
+          carePackageMaterial1
+        );
+        const outlineMaterial1 = new THREE.LineBasicMaterial({
+          color: "black",
+          linewidth: 1,
+          side: THREE.DoubleSide,
+        });
+        const outlineGeometry1 = new THREE.EdgesGeometry(carePackageGeometry1);
+        const outlineMesh1 = new THREE.LineSegments(
+          outlineGeometry1,
+          outlineMaterial1
+        );
+
+        const carePackageShape2 = new THREE.Shape();
+        carePackageShape2.moveTo(x + 0, y + 1);
+        carePackageShape2.lineTo(x + 5, y + 1);
+        carePackageShape2.lineTo(x + 5, y + 3);
+        carePackageShape2.lineTo(x - 5, y + 3);
+        carePackageShape2.lineTo(x - 5, y + 1);
+        carePackageShape2.lineTo(x - 0, y + 1);
+        carePackageShape2.closePath(); // Закрытие формы
+        const carePackageGeometry2 = new THREE.ShapeGeometry(carePackageShape2);
+        const carePackageMaterial2 = new THREE.MeshBasicMaterial({
+          color: "blue",
+          side: THREE.DoubleSide,
+        });
+        const carePackageMesh2 = new THREE.Mesh(
+          carePackageGeometry2,
+          carePackageMaterial2
+        );
+        const outlineMaterial2 = new THREE.LineBasicMaterial({
+          color: "black",
+          linewidth: 1,
+          side: THREE.DoubleSide,
+        });
+        const outlineGeometry2 = new THREE.EdgesGeometry(carePackageGeometry2);
+        const outlineMesh2 = new THREE.LineSegments(
+          outlineGeometry2,
+          outlineMaterial2
+        );
+
+        const carePackage = new THREE.Group();
+        carePackage.add(carePackageMesh1);
+        carePackage.add(outlineMesh1);
+        carePackage.add(carePackageMesh2);
+        carePackage.add(outlineMesh2);
+        carePackage.name = childName1;
+        carePackage.lookAt(0, 0, -1);
+        carePackage.rotateZ(Math.PI);
+        scene.add(carePackage);
+        carePackage.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2
+        );
       }
     });
     renderer.render(scene, camera);
   }
-
+  //========================================================
   let logVehicle = false;
 
   function isCharacterInVehicle(name, time) {
@@ -1087,16 +1274,24 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     // return logVehicle;
   }
-
-  function updatePlayerPositions(time) {
+  //========================================================
+  function drawPlayersPositions(time) {
     // Получаем все дочерние объекты сцены
     const allChildren = scene.children;
-    const childName = "circle_1";
+    const childName1 = "circle_1";
+    const childName2 = "circle_2";
+    const childName3 = "circle_3";
+    const childName4 = "circle_4";
     // Проходим по всем дочерним объектам
     for (let i = allChildren.length - 1; i >= 0; i--) {
       const child = allChildren[i];
       // Проверяем, имеет ли дочерний объект имя "circle_1"
-      if (child.name === childName) {
+      if (
+        child.name == childName1 ||
+        child.name == childName2 ||
+        child.name == childName3 ||
+        child.name == childName4
+      ) {
         // Удаляем дочерний объект из сцены
         scene.remove(child);
       }
@@ -1107,70 +1302,294 @@ document.addEventListener("DOMContentLoaded", async function () {
     // );
     const filteredPlayers = logPlayerPositionArray.filter(
       (player) =>
-        player.character.name &&
+        player.character.teamId != targetTeamId &&
         Math.abs(player.eventTimeGet - time) <= timeDelay
     );
 
     filteredPlayers.forEach((player) => {
       const teamId = player.character.teamId;
+      const playerIsInVehicle = player.vehicle;
 
-      const isInVehicle = isCharacterInVehicle(player.character.name, time);
-
-      let material1;
-      if (isInVehicle) {
-        // if (logVehicle) {
+      if (playerIsInVehicle != null) {
         // Если персонаж внутри транспортного средства, используем текстуру
-        material1 = new THREE.MeshBasicMaterial({
-          map: wheelTexture,
+        const material1 = new THREE.MeshBasicMaterial({
           color: teams[teamId].color,
           side: THREE.DoubleSide,
         });
-      } else {
-        // Если персонаж вне транспортного средства, используем другой материал
-        material1 = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-      }
-      let geometry1 = new THREE.CircleGeometry(4, 16);
-      // let material1 = new THREE.MeshBasicMaterial({
-      //   // map: wheelTexture,
-      //   // color: "white",
-      //   color: teams[teamId].color,
-      //   side: THREE.DoubleSide,
-      // });
-      // const mesh1 = new THREE.Mesh(geometry1, material1);
-
-      let geometry2 = new THREE.RingGeometry(3, 5, 16);
-      let material2 = new THREE.MeshBasicMaterial({
-        color: "black",
-        side: THREE.DoubleSide,
-      });
-      // const mesh2 = new THREE.Mesh(geometry2, material2);
-
-      let circle = scene.getObjectByName(player.name);
-
-      if (!circle) {
+        const geometry1 = new THREE.CircleGeometry(4, 32);
         const mesh1 = new THREE.Mesh(geometry1, material1);
+
+        const material2 = new THREE.MeshBasicMaterial({
+          color: "black",
+          side: THREE.DoubleSide,
+        });
+        const geometry2 = new THREE.RingGeometry(4, 5, 32);
         const mesh2 = new THREE.Mesh(geometry2, material2);
-        // circle = mesh1.add(mesh2);
-        circle = new THREE.Group();
+
+        const x = 0;
+        const y = 0;
+        const radius = 1.5;
+        let startAngle = 0;
+        let endAngle = 180;
+        const longX = 3.5;
+        const longY = 0.5;
+        const clockwise = false;
+        startAngle = startAngle * (Math.PI / 180);
+        endAngle = endAngle * (Math.PI / 180);
+
+        const wheelPath1 = new THREE.Shape();
+        wheelPath1.moveTo(x - longX, y + longY);
+        wheelPath1.lineTo(x + longX, y + longY);
+        wheelPath1.lineTo(x + longX, y - longY);
+        wheelPath1.lineTo(x - longX, y - longY);
+        wheelPath1.lineTo(x - longX, y + longY);
+        wheelPath1.moveTo(x, y);
+        wheelPath1.lineTo(x + longY, y);
+        wheelPath1.lineTo(x + longY, y - longX);
+        wheelPath1.lineTo(x - longY, y - longX);
+        wheelPath1.lineTo(x - longY, y);
+        wheelPath1.lineTo(x, y);
+        wheelPath1.moveTo(x, y);
+        wheelPath1.closePath();
+        const wheelGeometry1 = new THREE.ShapeGeometry(wheelPath1);
+        const wheelMaterial = new THREE.MeshBasicMaterial({
+          color: "black",
+          side: THREE.DoubleSide,
+        });
+        const wheel1 = new THREE.Mesh(wheelGeometry1, wheelMaterial);
+
+        const wheelPath2 = new THREE.Shape();
+        wheelPath2.moveTo(x, y);
+        wheelPath2.absarc(x, y, radius, startAngle, endAngle, clockwise);
+        wheelPath2.absarc(x, y, radius, endAngle, startAngle, clockwise);
+        wheelPath2.closePath();
+        const wheelGeometry2 = new THREE.ShapeGeometry(wheelPath2);
+
+        const wheel2 = new THREE.Mesh(wheelGeometry2, wheelMaterial);
+        const wheel = new THREE.Group();
+        wheel.add(wheel1);
+        wheel.add(wheel2);
+
+        scene.add(wheel);
+        wheel.position.set(0, 0, 0);
+
+        const circle = new THREE.Group();
         circle.add(mesh1);
         circle.add(mesh2);
-        circle.name = childName;
+        circle.add(wheel);
+        circle.name = childName1;
+        circle.lookAt(0, 0, -1);
+        circle.rotateZ(Math.PI);
         scene.add(circle);
+        // Обновляем позицию круга
+        circle.position.set(
+          player.character.location.x / divider - canvasWidth / 2,
+          player.character.location.y / divider - canvasHeight / 2,
+          0
+        );
+      } else {
+        // Если персонаж вне транспортного средства, используем другой материал
+        const material1 = new THREE.MeshBasicMaterial({
+          color: teams[teamId].color,
+          side: THREE.DoubleSide,
+        });
+        const geometry1 = new THREE.CircleGeometry(4, 32);
+        const mesh1 = new THREE.Mesh(geometry1, material1);
+
+        const material2 = new THREE.MeshBasicMaterial({
+          color: "black",
+          side: THREE.DoubleSide,
+        });
+        const geometry2 = new THREE.RingGeometry(4, 5, 32);
+        const mesh2 = new THREE.Mesh(geometry2, material2);
+
+        const circle = new THREE.Group();
+        circle.add(mesh1);
+        circle.add(mesh2);
+        circle.name = childName1;
+        scene.add(circle);
+        // Обновляем позицию круга
+        circle.position.set(
+          player.character.location.x / divider - canvasWidth / 2,
+          player.character.location.y / divider - canvasHeight / 2,
+          0
+        );
       }
-      // Обновляем позицию круга
-      circle.position.set(
-        player.character.location.x / divider - canvasWidth / 2,
-        player.character.location.y / divider - canvasHeight / 2,
-        0
-      );
+    });
+
+    const filteredPlayerName = logPlayerPositionArray.filter(
+      (player) =>
+        player.character.teamId == targetTeamId &&
+        Math.abs(player.eventTimeGet - time) <= timeDelay
+    );
+
+    filteredPlayerName.forEach((player) => {
+      const teamId = player.character.teamId;
+      const playerIsInVehicle = player.vehicle;
+
+      if (playerIsInVehicle != null) {
+        const starShape = new THREE.Shape();
+        const outerRadius = 5;
+        const innerRadius = 2;
+        const numPoints = 5;
+        let startAngle = 90;
+
+        const initialAngleOffset = startAngle * (Math.PI / 180);
+
+        for (let i = 0; i < numPoints * 2; i++) {
+          const angle = (i / numPoints) * Math.PI + initialAngleOffset; // Добавляем смещение угла;
+          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (i === 0) {
+            starShape.moveTo(x, y);
+          } else {
+            starShape.lineTo(x, y);
+          }
+        }
+        starShape.closePath();
+
+        const starGeometry = new THREE.ShapeGeometry(starShape);
+        const starMaterial = new THREE.MeshBasicMaterial({
+          color: teams[teamId].color,
+          side: THREE.DoubleSide,
+        });
+        const starMesh = new THREE.Mesh(starGeometry, starMaterial);
+        const outlineMaterial = new THREE.LineBasicMaterial({
+          color: "black",
+          linewidth: 2,
+          side: THREE.DoubleSide,
+        });
+        const outlineGeometry = new THREE.EdgesGeometry(starGeometry);
+        const outlineMesh = new THREE.LineSegments(
+          outlineGeometry,
+          outlineMaterial
+        );
+
+        const star = new THREE.Group();
+        star.add(outlineMesh);
+        star.add(starMesh);
+        star.name = childName1;
+        star.scale.set(1.2, 1.2, 0);
+        scene.add(star);
+
+        const x = 0;
+        const y = 0;
+        const radius = 1.5;
+        startAngle = 0;
+        let endAngle = 180;
+        const longX = 3.5;
+        const longY = 0.5;
+        const clockwise = false;
+        startAngle = startAngle * (Math.PI / 180);
+        endAngle = endAngle * (Math.PI / 180);
+
+        const wheelPath1 = new THREE.Shape();
+        wheelPath1.moveTo(x - longX, y + longY);
+        wheelPath1.lineTo(x + longX, y + longY);
+        wheelPath1.lineTo(x + longX, y - longY);
+        wheelPath1.lineTo(x - longX, y - longY);
+        wheelPath1.lineTo(x - longX, y + longY);
+        wheelPath1.moveTo(x, y);
+        wheelPath1.lineTo(x + longY, y);
+        wheelPath1.lineTo(x + longY, y - longX);
+        wheelPath1.lineTo(x - longY, y - longX);
+        wheelPath1.lineTo(x - longY, y);
+        wheelPath1.lineTo(x, y);
+        wheelPath1.moveTo(x, y);
+        wheelPath1.closePath();
+        const wheelGeometry1 = new THREE.ShapeGeometry(wheelPath1);
+        const wheelMaterial = new THREE.MeshBasicMaterial({
+          color: "black",
+          side: THREE.DoubleSide,
+        });
+        const wheel1 = new THREE.Mesh(wheelGeometry1, wheelMaterial);
+
+        const wheelPath2 = new THREE.Shape();
+        wheelPath2.moveTo(x, y);
+        wheelPath2.absarc(x, y, radius, startAngle, endAngle, clockwise);
+        wheelPath2.absarc(x, y, radius, endAngle, startAngle, clockwise);
+        wheelPath2.closePath();
+        const wheelGeometry2 = new THREE.ShapeGeometry(wheelPath2);
+
+        const wheel2 = new THREE.Mesh(wheelGeometry2, wheelMaterial);
+        const wheel = new THREE.Group();
+        wheel.add(wheel1);
+        wheel.add(wheel2);
+
+        const starPlayer = new THREE.Group();
+        starPlayer.add(star);
+        starPlayer.add(wheel);
+        starPlayer.name = childName1;
+        starPlayer.lookAt(0, 0, -1);
+        starPlayer.rotateZ(Math.PI);
+        scene.add(starPlayer);
+        // Обновляем позицию круга
+        starPlayer.position.set(
+          player.character.location.x / divider - canvasWidth / 2,
+          player.character.location.y / divider - canvasHeight / 2,
+          0
+        );
+      } else {
+        // Если персонаж вне транспортного средства, используем другой материал
+        const starShape = new THREE.Shape();
+        const outerRadius = 5;
+        const innerRadius = 2;
+        const numPoints = 5;
+        let startAngle = 90;
+
+        const initialAngleOffset = startAngle * (Math.PI / 180);
+
+        for (let i = 0; i < numPoints * 2; i++) {
+          const angle = (i / numPoints) * Math.PI + initialAngleOffset; // Добавляем смещение угла;
+          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          if (i === 0) {
+            starShape.moveTo(x, y);
+          } else {
+            starShape.lineTo(x, y);
+          }
+        }
+        starShape.closePath();
+
+        const starGeometry = new THREE.ShapeGeometry(starShape);
+        const starMaterial = new THREE.MeshBasicMaterial({
+          color: teams[teamId].color,
+          side: THREE.DoubleSide,
+        });
+        const starMesh = new THREE.Mesh(starGeometry, starMaterial);
+        const outlineMaterial = new THREE.LineBasicMaterial({
+          color: "black",
+          linewidth: 2,
+          side: THREE.DoubleSide,
+        });
+        const outlineGeometry = new THREE.EdgesGeometry(starGeometry);
+        const outlineMesh = new THREE.LineSegments(
+          outlineGeometry,
+          outlineMaterial
+        );
+
+        const star = new THREE.Group();
+        star.add(outlineMesh);
+        star.add(starMesh);
+        star.name = childName1;
+        star.lookAt(0, 0, -1);
+        star.rotateZ(Math.PI);
+        star.scale.set(1.2, 1.2, 0);
+        scene.add(star);
+        // Обновляем позицию круга
+        star.position.set(
+          player.character.location.x / divider - canvasWidth / 2,
+          player.character.location.y / divider - canvasHeight / 2,
+          0
+        );
+      }
     });
     // Рендеринг сцены
     renderer.render(scene, camera);
   }
-
+  //========================================================
   // Функция для отрисовки кольца
   function drawZones(time) {
     // Получаем все дочерние объекты сцены
@@ -1261,7 +1680,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Рендеринг сцены
     renderer.render(scene, camera);
   }
-
+  //========================================================
   function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);

@@ -8,39 +8,52 @@
   <body>
     <div>
       <form>
-        <label for="playerNameLabel">Имя игрока:</label>
-        <input type="text" id="playerName" name="playerName" />
-        <label for="platform">Платформа:</label>
+        <label for="playerName">Player name:</label>
+        <input
+          type="text"
+          id="playerName"
+          name="playerName"
+          placeholder="Enter player name"
+        />
+        <label for="platform">Platform:</label>
         <select id="platform" name="platform">
-          <option value="steam">Steam</option>
+          <option value="steam" selected>Steam</option>
+          <option value="cacao">Cacao</option>
           <option value="xbox">XBox</option>
           <option value="console">Console</option>
+          <option value="stadia">Stadia</option>
+          <option value="psn">PSN</option>
+          <option value="tournament">Tournament</option>
         </select>
+        <button
+          id="searchMapsButtonId"
+          name="searchMapsButtonName"
+          type="button"
+        >
+          Search maps
+        </button>
         <select id="match" name="match"></select>
-        <button onclick="searchPlayer()">Найти игрока</button>
+        <button id="loadMapId" name="loadMapName" type="button">
+          Load map
+        </button>
       </form>
     </div>
-    <!-- <div>
-      <button onclick="loadAndDrawImage()">
-        Загрузить и нарисовать изображение
-      </button>
-    </div> -->
-    <div class="canvasPlayer" id="canvasPlayer">
-      <!-- <canvas id="mapCanvas" width="819" height="819"></canvas> -->
-      <!-- <canvas id="playerCanvas" width="819" height="819"></canvas>
-      <canvas id="deathCanvas" width="819" height="819"></canvas> -->
-    </div>
+    <div class="canvasPlayer" id="canvasPlayer"></div>
     <div class="container wrap">
       <div class="box slider">
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value="0"
-          class="slider"
-          id="timeSlider"
-        />
-        <p>Прокрутка времени: <span id="currentTime">0</span></p>
+        <div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value="0"
+            class="slider"
+            id="timeSlider"
+          />
+        </div>
+        <div>
+          <p>Match time: <span id="currentTime">00:00:00</span></p>
+        </div>
       </div>
       <div class="box radioButtons">
         <button id="playButton">Play</button>
@@ -54,7 +67,7 @@
       </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.min.js"></script>
+    <script src="apikey.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

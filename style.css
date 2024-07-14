@@ -14,7 +14,7 @@ canvas {
   top: 850px;
   left: 20px;
   float: left;
-  width: 300px;
+  width: 400px;
 }
 
 .radioButtons {
@@ -26,4 +26,10 @@ canvas {
 
 .box {
   position: relative;
+}
+select#match {
+  width: 190px; /* Ширина списка в пикселах */
+}
+input#playerName {
+  width: 130px; /* Ширина списка в пикселах */
 }
