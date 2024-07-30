@@ -254,8 +254,6 @@ loadMapId.addEventListener("click", async function () {
   const stopButton = document.getElementById("stopButton");
   const canvasPlayer = document.getElementById("canvasPlayer");
 
-  timeSlider.value = 0;
-
   let startTime, endTime;
   let startTimeMatch, endTimeMatch;
 
@@ -287,12 +285,19 @@ loadMapId.addEventListener("click", async function () {
   const matchDuration = endTime - startTime;
 
   // Расчет продолжительности матча
-  timeSlider.min = startTime; // Преобразование в миллисекунды
+  timeSlider.min = startTime;
   timeSlider.max = endTime;
   timeSlider.step = 1000; // Шаг в миллисекундах
+  timeSlider.value = startTime;
+
   // timeSlider.min = minTime; // Преобразование в миллисекунды
   // timeSlider.max = maxTime;
   // timeSlider.step = 1; // Шаг в секундах
+
+  // console.log(timeSlider);
+  // console.log(timeSlider.min);
+  // console.log(timeSlider.max);
+  // console.log(timeSlider.value);
 
   let timeDelay = 5000;
   let teams = {};
@@ -308,6 +313,7 @@ loadMapId.addEventListener("click", async function () {
   let logPlayerAttackArray = [];
   let logPlayerTakeDamageArray = [];
   let logPlayerMakeGroggyArray = [];
+  let logPlayerReviveArray = [];
   let logCarePackageLandArray = [];
   let logCarePackageSpawnArray = [];
   let logItemPickupFromCarepackageArray = [];
@@ -545,6 +551,7 @@ loadMapId.addEventListener("click", async function () {
       const distance = i.distance;
       const isAttackerInVehicle = i.isAttackerInVehicle;
       const dBNOId = i.dBNOId;
+      const isThroughPenetrableWall = i.isThroughPenetrableWall;
       const common = i.common;
 
       logPlayerMakeGroggyArray.push({
@@ -559,6 +566,23 @@ loadMapId.addEventListener("click", async function () {
         victimWeaponAdditionalInfo,
         distance,
         isAttackerInVehicle,
+        dBNOId,
+        isThroughPenetrableWall,
+        common,
+        eventTimeGet,
+      });
+    }
+    if (i && i._T === "LogPlayerRevive") {
+      const eventTime = new Date(i._D);
+      const eventTimeGet = eventTime.getTime();
+      const reviver = i.reviver;
+      const victim = i.victim;
+      const dBNOId = i.dBNOId;
+      const common = i.common;
+
+      logPlayerReviveArray.push({
+        reviver,
+        victim,
         dBNOId,
         common,
         eventTimeGet,
@@ -607,7 +631,15 @@ loadMapId.addEventListener("click", async function () {
       });
     }
   });
+  // console.log(logPlayerAttackArray);
+  // console.log(logPlayerPositionArray);
+  // console.log(logPlayerMakeGroggyArray);
+  // console.log(logPlayerTakeDamageArray);
+  // console.log(logPlayerKillV2Array);
+  // console.log(logPlayerReviveArray);
   //========================================================
+  let targetTeamId;
+  let playersInSameTeam;
   logPlayerCreateArray.forEach((player) => {
     // Получение teamId текущего персонажа
     let teamId = player.character.teamId;
@@ -618,15 +650,12 @@ loadMapId.addEventListener("click", async function () {
     }
     // Добавляем персонажа в список команды
     teams[teamId].push(player.character);
-  });
-  //========================================================
-  let targetTeamId;
-  let playersInSameTeam;
-  logPlayerCreateArray.forEach((player) => {
+    // Проверяем, является ли текущий игрок целевым
     if (player.character.name == playerName) {
       targetTeamId = player.character.teamId;
     }
   });
+
   if (targetTeamId) {
     // Фильтруем игроков, принадлежащих той же команде
     playersInSameTeam = logPlayerCreateArray.filter(
@@ -639,7 +668,7 @@ loadMapId.addEventListener("click", async function () {
   logVehicleLeaveArray.forEach((player) => {
     if (
       player.vehicle.vehicleType === "TransportAircraft" &&
-      player.common.isGame <= 0.5
+      player.common.isGame <= 0.2
     ) {
       logVehicleLeaveArrayArray.push(player);
     }
@@ -775,6 +804,7 @@ loadMapId.addEventListener("click", async function () {
     }
   });
 
+  //========================================================
   // Инициализация Three.js
   const scene = new THREE.Scene();
   const renderer = new THREE.WebGLRenderer({
@@ -791,7 +821,6 @@ loadMapId.addEventListener("click", async function () {
     targetDomElement.id = "playerCanvas";
   }
 
-  //========================================================
   const camera = new THREE.OrthographicCamera(
     canvasWidth / -2,
     canvasWidth / 2,
@@ -804,7 +833,6 @@ loadMapId.addEventListener("click", async function () {
   camera.lookAt(0, 0, 1);
   camera.rotateZ(Math.PI);
   //========================================================
-  const wheelTexture = loader.load("public/picture/wheel.png");
   // Создаем геометрию и материал для плоскости
   let planeGeometry = new THREE.PlaneGeometry(canvasWidth, canvasHeight);
   let planeMaterial = new THREE.MeshBasicMaterial({
@@ -815,9 +843,6 @@ loadMapId.addEventListener("click", async function () {
   plane.lookAt(0, 0, -1);
   plane.rotateZ(Math.PI);
   scene.add(plane);
-  //========================================================
-  // Функция для изменения уровня "zoom"
-  let currentScale = 1; // Начальный масштаб
   //=========================================
   // canvasPlayer[0].addEventListener("mousemove", (e) => {
   //   const rect = canvasPlayer[0].getBoundingClientRect();
@@ -837,9 +862,7 @@ loadMapId.addEventListener("click", async function () {
   //=========================================
   function drawFlyingLine() {
     const childName = "flyingLine";
-    const material = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-    });
+
     let pointFirst, pointSecond;
     let pointFirstEquation, pointSecondEquation;
     let endX, endY;
@@ -882,8 +905,6 @@ loadMapId.addEventListener("click", async function () {
     pointFirstEquation = { x: x1, y: y1, z: 0 };
     pointSecondEquation = { x: endX, y: endY, z: 0 };
     const points = [pointFirstEquation, pointSecondEquation];
-    // const points = [pointFirst, pointSecond];
-    // console.log(points);
 
     const scaledPoints = points.map((point) => ({
       x: point.x / divider,
@@ -896,18 +917,28 @@ loadMapId.addEventListener("click", async function () {
       z: 0,
     }));
 
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+    });
     const geometry = new THREE.BufferGeometry().setFromPoints(minusPoints);
     const line = new THREE.Line(geometry, material);
     line.name = childName;
     scene.add(line);
     renderer.render(scene, camera);
   }
+  drawFlyingLine();
   //========================================================
-  function changeZoom(delta, mouseX, mouseY) {
+  // Функция для изменения уровня "zoom"
+  let currentScale = 1; // Начальный масштаб
+  //========================================================
+  function changeZoom(event) {
+    event.preventDefault(); // Предотвращаем стандартное поведение прокрутки страницы
+    let delta = event.deltaY > 0 ? 0.9 : 1.1; // Увеличиваем "zoom" при прокрутке вниз, уменьшаем при прокрутке вверх
+
     currentScale *= delta;
 
     const maxScale = 1;
-    const minScale = 0.25;
+    const minScale = 0.1;
     // Ограничение масштаба
     if (currentScale > maxScale) currentScale = maxScale;
     if (currentScale < minScale) currentScale = minScale;
@@ -917,62 +948,27 @@ loadMapId.addEventListener("click", async function () {
     const halfWidth = (Math.abs(currentScale) * canvasWidth) / 2;
     const halfHeight = (Math.abs(currentScale) * canvasHeight) / 2;
 
-    camera.left = 0;
-    camera.right = 2 * halfWidth * aspectRatio;
-    camera.top = 2 * halfHeight;
-    camera.bottom = 0;
-    // camera.left = -halfWidth * aspectRatio;
-    // camera.right = halfWidth * aspectRatio;
-    // camera.top = halfHeight;
-    // camera.bottom = -halfHeight;
+    camera.left = -halfWidth * aspectRatio;
+    camera.right = halfWidth * aspectRatio;
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
 
     camera.updateProjectionMatrix();
 
     // Обновляем позицию камеры, чтобы сфокусироваться на курсоре
-    camera.position.set(mouseX, mouseY, 0);
+    // camera.position.set(mouseX, mouseY, 0);
 
     // Рендеринг сцены
     renderScene();
   }
 
-  // canvasPlayer1.addEventListener("wheel", onWheelZoom);
-  // canvasPlayer[0].addEventListener("wheel", onWheelZoom, {
-  //   passive: false,
-  // });
-
-  // function onWheelZoom(event) {
-  //   event.preventDefault(); // Предотвращаем стандартное поведение прокрутки страницы
-  //   let delta = event.deltaY < 0 ? 1.1 : 1 / 1.1; // Увеличиваем "zoom" при прокрутке вниз, уменьшаем при прокрутке вверх
-  //   changeZoom(delta);
-  // }
-
   function renderScene() {
     renderer.render(scene, camera);
   }
-  //========================================================
-  // Обработчик событияMouseMove для изменения масштаба под курсором мыши
-  let lastMouseX = null;
-  let lastMouseY = null;
 
-  function onWheel(event) {
-    event.preventDefault(); // Предотвращаем стандартное поведение прокрутки страницы
-
-    const rect = canvasPlayer.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left; // Получаем X координату курсора относительно canvasPlayer
-    const mouseY = event.clientY - rect.top; // Получаем Y координату курсора относительно canvasPlayer
-    console.log(mouseX, mouseY);
-    // Вычисляем новый масштаб в зависимости от положения курсора
-    let delta = event.deltaY < 0 ? 1.1 : 1 / 1.1; // Увеличиваем "zoom" при прокрутке вниз, уменьшаем при прокрутке вверх
-    // console.log(delta);
-    changeZoom(delta, mouseX, mouseY);
-
-    // Обновляем последние координаты мыши
-    lastMouseX = mouseX;
-    lastMouseY = mouseY;
-  }
-
-  // Добавляем обработчик события
-  // canvasPlayer[0].addEventListener("wheel", onWheel, { passive: false });
+  canvasPlayer.addEventListener("wheel", changeZoom, {
+    passive: false,
+  });
   // =======================================================
   function generateSequence(start, end, step) {
     let sequence = [];
@@ -986,14 +982,13 @@ loadMapId.addEventListener("click", async function () {
   //========================================================
   timeSlider.addEventListener("input", function () {
     const time = this.valueAsNumber;
-    // console.log("-----");
     console.log(time);
     const timeInSeconds = time / 1000 - startTime / 1000;
 
-    drawFlyingLine();
     drawPlayersPositions(time);
     drawZones(time);
     playerTakeDamage(time);
+    drawPlayersGroggy(time);
     playerDeath(time);
     carePackage(time);
 
@@ -1013,9 +1008,11 @@ loadMapId.addEventListener("click", async function () {
   function nextTime() {
     if (shouldContinue && index < numbers.length) {
       const time = numbers[index];
+
       drawPlayersPositions(time);
       drawZones(time);
       playerTakeDamage(time);
+      drawPlayersGroggy(time);
       playerDeath(time);
       carePackage(time);
 
@@ -1096,9 +1093,40 @@ loadMapId.addEventListener("click", async function () {
     renderer.render(scene, camera);
   }
   //========================================================
+  const outlineColor = "#ffffff";
+  const groggyColor = "#ff0000";
+  //========================================================
+  function createCrossMesh(crossWidth, crossHeight, color) {
+    const x = 0;
+    const y = 0;
+    const crossShape = new THREE.Shape();
+    crossShape.moveTo(x, y - crossHeight / 2);
+    crossShape.lineTo(x + crossWidth / 2, y - crossHeight);
+    crossShape.lineTo(x + crossWidth, y - crossHeight / 2);
+    crossShape.lineTo(x + crossWidth / 2, y);
+    crossShape.lineTo(x + crossWidth, y + crossHeight / 2);
+    crossShape.lineTo(x + crossWidth / 2, y + crossHeight);
+    crossShape.lineTo(x, y + crossHeight / 2);
+    crossShape.lineTo(x - crossWidth / 2, y + crossHeight);
+    crossShape.lineTo(x - crossWidth, y + crossHeight / 2);
+    crossShape.lineTo(x - crossWidth / 2, y);
+    crossShape.lineTo(x - crossWidth, y - crossHeight / 2);
+    crossShape.lineTo(x - crossWidth / 2, y - crossHeight);
+    crossShape.lineTo(x, y - crossHeight / 2);
+    crossShape.closePath();
+
+    const crossGeometry = new THREE.ShapeGeometry(crossShape);
+    const crossMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+    });
+    const crossMesh = new THREE.Mesh(crossGeometry, crossMaterial); // Добавление заполнения креста
+
+    return crossMesh;
+  }
+  //========================================================
   function playerDeath(time) {
     const childName1 = "playerDeath_1";
-    const childName2 = "playerDeath_2";
 
     const filteredEvents = logPlayerKillV2Array.filter(
       (event) => Math.abs(event.eventTimeGet - time) <= timeDelay
@@ -1110,48 +1138,12 @@ loadMapId.addEventListener("click", async function () {
         const startX = event.victim.location.x / divider;
         const startY = event.victim.location.y / divider;
 
-        const x = 0,
-          y = 0; // Начальная точка
-        const crossShape = new THREE.Shape();
-        const crossWidth = 5,
-          crossHeight = 5;
-        crossShape.moveTo(x, y - crossHeight / 2);
-        crossShape.lineTo(x + crossWidth / 2, y - crossHeight);
-        crossShape.lineTo(x + crossWidth, y - crossHeight / 2);
-        crossShape.lineTo(x + crossWidth / 2, y);
-        crossShape.lineTo(x + crossWidth, y + crossHeight / 2);
-        crossShape.lineTo(x + crossWidth / 2, y + crossHeight);
-        crossShape.lineTo(x, y + crossHeight / 2);
-        crossShape.lineTo(x - crossWidth / 2, y + crossHeight);
-        crossShape.lineTo(x - crossWidth, y - crossHeight / 2);
-        crossShape.lineTo(x - crossWidth / 2, y);
-        crossShape.lineTo(x - crossWidth, y - crossHeight / 2);
-        crossShape.lineTo(x - crossWidth / 2, y - crossHeight);
-        crossShape.lineTo(x, y - crossHeight / 2);
-        crossShape.closePath(); // Закрытие формы
-        const crossGeometry = new THREE.ShapeGeometry(crossShape);
-        const crossMaterial = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-        const crossMesh = new THREE.Mesh(crossGeometry, crossMaterial);
-
-        const outlineMaterial = new THREE.LineBasicMaterial({
-          color: "black",
-          linewidth: 2,
-          side: THREE.DoubleSide,
-        });
-        const outlineGeometry = new THREE.EdgesGeometry(crossGeometry);
-        const outlineMesh = new THREE.LineSegments(
-          outlineGeometry,
-          outlineMaterial
-        );
-
+        const crossMesh1 = createCrossMesh(6, 6, outlineColor);
+        const crossMesh2 = createCrossMesh(5, 5, teams[teamId].color);
         const cross = new THREE.Group();
-        cross.add(outlineMesh);
-        cross.add(crossMesh);
+        cross.add(crossMesh1);
+        cross.add(crossMesh2);
         cross.name = childName1;
-        cross.lookAt(0, 0, -1);
         cross.rotateZ(Math.PI);
         scene.add(cross);
         cross.position.set(startX - canvasWidth / 2, startY - canvasHeight / 2);
@@ -1160,9 +1152,28 @@ loadMapId.addEventListener("click", async function () {
     renderer.render(scene, camera);
   }
   //========================================================
+  function createCarePackage(color, x, y, width, height) {
+    const shape = new THREE.Shape();
+    shape.moveTo(x, y);
+    shape.lineTo(x + width, y);
+    shape.lineTo(x + width, y - height);
+    shape.lineTo(x - width, y - height);
+    shape.lineTo(x - width, y);
+    shape.lineTo(x, y);
+    shape.closePath();
+
+    const geometry = new THREE.ShapeGeometry(shape);
+    const material = new THREE.MeshBasicMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+
+    return mesh;
+  }
+  //========================================================
   function carePackage(time) {
     const childName1 = "carePackage_1";
-    const childName2 = "carePackage_2";
 
     const filteredEvents = logCarePackageLandArray.filter(
       (event) => Math.abs(event.eventTimeGet - time) <= timeDelay
@@ -1173,71 +1184,48 @@ loadMapId.addEventListener("click", async function () {
         const startX = event.itemPackage.location.x / divider;
         const startY = event.itemPackage.location.y / divider;
 
-        const x = 0,
-          y = 0; // Начальная точка
-        const carePackageShape1 = new THREE.Shape();
-        carePackageShape1.moveTo(x + 0, y + 0);
-        carePackageShape1.lineTo(x + 5, y + 0);
-        carePackageShape1.lineTo(x + 5, y - 4);
-        carePackageShape1.lineTo(x - 5, y - 4);
-        carePackageShape1.lineTo(x - 5, y + 0);
-        carePackageShape1.lineTo(x + 0, y + 0);
-        carePackageShape1.closePath(); // Закрытие формы
-        const carePackageGeometry1 = new THREE.ShapeGeometry(carePackageShape1);
-        const carePackageMaterial1 = new THREE.MeshBasicMaterial({
-          color: "red",
+        const carePackageWidth = 5;
+        const carePackageHeight = 4;
+        const borderWidth = 1;
+        const outlineWidth = carePackageWidth + borderWidth;
+        const outlineHeight = 2 * carePackageHeight + 2 * borderWidth;
+        const x = 0;
+        const y = outlineHeight / 2; // Начальная точка
+        const outlineShape = new THREE.Shape();
+        outlineShape.moveTo(x, y);
+        outlineShape.lineTo(x + outlineWidth, y);
+        outlineShape.lineTo(x + outlineWidth, y - outlineHeight);
+        outlineShape.lineTo(x - outlineWidth, y - outlineHeight);
+        outlineShape.lineTo(x - outlineWidth, y);
+        outlineShape.lineTo(x, y);
+        outlineShape.closePath(); // Закрытие формы
+        const outlineGeometry = new THREE.ShapeGeometry(outlineShape);
+        const outlineMaterial = new THREE.MeshBasicMaterial({
+          color: outlineColor,
           side: THREE.DoubleSide,
         });
-        const carePackageMesh1 = new THREE.Mesh(
-          carePackageGeometry1,
-          carePackageMaterial1
-        );
-        const outlineMaterial1 = new THREE.LineBasicMaterial({
-          color: "black",
-          linewidth: 1,
-          side: THREE.DoubleSide,
-        });
-        const outlineGeometry1 = new THREE.EdgesGeometry(carePackageGeometry1);
-        const outlineMesh1 = new THREE.LineSegments(
-          outlineGeometry1,
-          outlineMaterial1
-        );
+        const outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
 
-        const carePackageShape2 = new THREE.Shape();
-        carePackageShape2.moveTo(x + 0, y + 1);
-        carePackageShape2.lineTo(x + 5, y + 1);
-        carePackageShape2.lineTo(x + 5, y + 3);
-        carePackageShape2.lineTo(x - 5, y + 3);
-        carePackageShape2.lineTo(x - 5, y + 1);
-        carePackageShape2.lineTo(x - 0, y + 1);
-        carePackageShape2.closePath(); // Закрытие формы
-        const carePackageGeometry2 = new THREE.ShapeGeometry(carePackageShape2);
-        const carePackageMaterial2 = new THREE.MeshBasicMaterial({
-          color: "blue",
-          side: THREE.DoubleSide,
-        });
-        const carePackageMesh2 = new THREE.Mesh(
-          carePackageGeometry2,
-          carePackageMaterial2
+        const carePackage1 = createCarePackage(
+          "red",
+          0,
+          0,
+          carePackageWidth,
+          carePackageHeight
         );
-        const outlineMaterial2 = new THREE.LineBasicMaterial({
-          color: "black",
-          linewidth: 1,
-          side: THREE.DoubleSide,
-        });
-        const outlineGeometry2 = new THREE.EdgesGeometry(carePackageGeometry2);
-        const outlineMesh2 = new THREE.LineSegments(
-          outlineGeometry2,
-          outlineMaterial2
+        const carePackage2 = createCarePackage(
+          "blue",
+          0,
+          4,
+          carePackageWidth,
+          carePackageHeight
         );
 
         const carePackage = new THREE.Group();
-        carePackage.add(carePackageMesh1);
-        carePackage.add(outlineMesh1);
-        carePackage.add(carePackageMesh2);
-        carePackage.add(outlineMesh2);
+        carePackage.add(outlineMesh);
+        carePackage.add(carePackage1);
+        carePackage.add(carePackage2);
         carePackage.name = childName1;
-        carePackage.lookAt(0, 0, -1);
         carePackage.rotateZ(Math.PI);
         scene.add(carePackage);
         carePackage.position.set(
@@ -1249,339 +1237,374 @@ loadMapId.addEventListener("click", async function () {
     renderer.render(scene, camera);
   }
   //========================================================
-  let logVehicle = false;
+  function createCirclePlayer(
+    outlineColor,
+    color,
+    radiusPlayer,
+    radiusOutline
+  ) {
+    const material1 = new THREE.MeshBasicMaterial({
+      color: outlineColor,
+      side: THREE.DoubleSide,
+    });
+    const geometry1 = new THREE.CircleGeometry(radiusOutline, 32);
+    const mesh1 = new THREE.Mesh(geometry1, material1);
 
-  function isCharacterInVehicle(name, time) {
-    const rideInEvent = logVehicleRideArray.find(
-      (event) =>
-        event.character.name === name &&
-        Math.abs(event.eventTimeGet - time) <= timeDelay
-    );
-    const rideOutEvent = logVehicleLeaveArray.find(
-      (event) =>
-        event.character.name === name &&
-        Math.abs(event.eventTimeGet - time) <= timeDelay
-    );
-    if (rideInEvent) {
-      logVehicle = true;
-      // return logVehicle;
-      return true;
-    }
-    if (rideOutEvent) {
-      logVehicle = false;
-      // return logVehicle;
-      return false;
-    }
-    // return logVehicle;
+    const geometry2 = new THREE.CircleGeometry(radiusPlayer, 32);
+    const material2 = new THREE.MeshBasicMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+    });
+    const mesh2 = new THREE.Mesh(geometry2, material2);
+
+    const circle = new THREE.Group();
+    circle.add(mesh1);
+    circle.add(mesh2);
+
+    return circle;
   }
+  //========================================================
+  function createWheelPlayer(wheelWidth, wheelHeight, radius) {
+    const x = 0;
+    const y = 0;
+    let startAngle = 0;
+    let endAngle = 180;
+    const clockwise = false;
+    startAngle = startAngle * (Math.PI / 180);
+    endAngle = endAngle * (Math.PI / 180);
+
+    const wheelPath1 = new THREE.Shape();
+    wheelPath1.moveTo(x - wheelWidth, y + wheelHeight);
+    wheelPath1.lineTo(x + wheelWidth, y + wheelHeight);
+    wheelPath1.lineTo(x + wheelWidth, y - wheelHeight);
+    wheelPath1.lineTo(x - wheelWidth, y - wheelHeight);
+    wheelPath1.lineTo(x - wheelWidth, y + wheelHeight);
+    wheelPath1.moveTo(x, y);
+    wheelPath1.lineTo(x + wheelHeight, y);
+    wheelPath1.lineTo(x + wheelHeight, y - wheelWidth);
+    wheelPath1.lineTo(x - wheelHeight, y - wheelWidth);
+    wheelPath1.lineTo(x - wheelHeight, y);
+    wheelPath1.lineTo(x, y);
+    wheelPath1.moveTo(x, y);
+    wheelPath1.closePath();
+
+    const wheelMaterial = new THREE.MeshBasicMaterial({
+      color: outlineColor,
+      side: THREE.DoubleSide,
+    });
+
+    const wheelGeometry1 = new THREE.ShapeGeometry(wheelPath1);
+    const wheel1 = new THREE.Mesh(wheelGeometry1, wheelMaterial);
+
+    const wheelPath2 = new THREE.Shape();
+    wheelPath2.moveTo(x, y);
+    wheelPath2.absarc(x, y, radius, startAngle, endAngle, clockwise);
+    wheelPath2.absarc(x, y, radius, endAngle, startAngle, clockwise);
+    wheelPath2.closePath();
+    const wheelGeometry2 = new THREE.ShapeGeometry(wheelPath2);
+    const wheel2 = new THREE.Mesh(wheelGeometry2, wheelMaterial);
+
+    const wheel = new THREE.Group();
+    wheel.add(wheel1);
+    wheel.add(wheel2);
+
+    return wheel;
+  }
+  //========================================================
+  function createStarPlayer(color, innerRadius, outerRadius, numPoints) {
+    let startAngle = 90;
+    const starShape = new THREE.Shape();
+
+    const initialAngleOffset = startAngle * (Math.PI / 180);
+
+    for (let i = 0; i < numPoints * 2; i++) {
+      const angle = (i / numPoints) * Math.PI + initialAngleOffset; // Добавляем смещение угла;
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (i === 0) {
+        starShape.moveTo(x, y);
+      } else {
+        starShape.lineTo(x, y);
+      }
+    }
+    starShape.closePath();
+
+    const starGeometry = new THREE.ShapeGeometry(starShape);
+    const starMaterial = new THREE.MeshBasicMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+    });
+    const starMesh = new THREE.Mesh(starGeometry, starMaterial);
+
+    return starMesh;
+  }
+  //========================================================
+  const wheelRadius = 1.5;
+  const wheelWidth = 4;
+  const wheelHeight = 0.5;
   //========================================================
   function drawPlayersPositions(time) {
     // Получаем все дочерние объекты сцены
     const allChildren = scene.children;
-    const childName1 = "circle_1";
-    const childName2 = "circle_2";
-    const childName3 = "circle_3";
-    const childName4 = "circle_4";
-    // Проходим по всем дочерним объектам
-    for (let i = allChildren.length - 1; i >= 0; i--) {
-      const child = allChildren[i];
-      // Проверяем, имеет ли дочерний объект имя "circle_1"
-      if (
-        child.name == childName1 ||
-        child.name == childName2 ||
-        child.name == childName3 ||
-        child.name == childName4
-      ) {
-        // Удаляем дочерний объект из сцены
+    const childNames = [
+      "circle_1",
+      "circle_2",
+      "circle_3",
+      "circle_4",
+      "circle_5",
+    ];
+    allChildren.forEach((child) => {
+      if (childNames.includes(child.name)) {
         scene.remove(child);
       }
-    }
-
+    });
     // const filteredPlayers = logPlayerPositionArray.filter(
     //   (player) => player.character.name && player.elapsedTime == time
     // );
-    const filteredPlayers = logPlayerPositionArray.filter(
+
+    const filteredPlayersPositionNoTeam = logPlayerPositionArray.filter(
       (player) =>
         player.character.teamId != targetTeamId &&
         Math.abs(player.eventTimeGet - time) <= timeDelay
     );
 
-    filteredPlayers.forEach((player) => {
+    filteredPlayersPositionNoTeam.forEach((player) => {
       const teamId = player.character.teamId;
       const playerIsInVehicle = player.vehicle;
+      const startX = player.character.location.x / divider;
+      const startY = player.character.location.y / divider;
 
       if (playerIsInVehicle != null) {
-        // Если персонаж внутри транспортного средства, используем текстуру
-        const material1 = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-        const geometry1 = new THREE.CircleGeometry(4, 32);
-        const mesh1 = new THREE.Mesh(geometry1, material1);
-
-        const material2 = new THREE.MeshBasicMaterial({
-          color: "black",
-          side: THREE.DoubleSide,
-        });
-        const geometry2 = new THREE.RingGeometry(4, 5, 32);
-        const mesh2 = new THREE.Mesh(geometry2, material2);
-
-        const x = 0;
-        const y = 0;
-        const radius = 1.5;
-        let startAngle = 0;
-        let endAngle = 180;
-        const longX = 3.5;
-        const longY = 0.5;
-        const clockwise = false;
-        startAngle = startAngle * (Math.PI / 180);
-        endAngle = endAngle * (Math.PI / 180);
-
-        const wheelPath1 = new THREE.Shape();
-        wheelPath1.moveTo(x - longX, y + longY);
-        wheelPath1.lineTo(x + longX, y + longY);
-        wheelPath1.lineTo(x + longX, y - longY);
-        wheelPath1.lineTo(x - longX, y - longY);
-        wheelPath1.lineTo(x - longX, y + longY);
-        wheelPath1.moveTo(x, y);
-        wheelPath1.lineTo(x + longY, y);
-        wheelPath1.lineTo(x + longY, y - longX);
-        wheelPath1.lineTo(x - longY, y - longX);
-        wheelPath1.lineTo(x - longY, y);
-        wheelPath1.lineTo(x, y);
-        wheelPath1.moveTo(x, y);
-        wheelPath1.closePath();
-        const wheelGeometry1 = new THREE.ShapeGeometry(wheelPath1);
-        const wheelMaterial = new THREE.MeshBasicMaterial({
-          color: "black",
-          side: THREE.DoubleSide,
-        });
-        const wheel1 = new THREE.Mesh(wheelGeometry1, wheelMaterial);
-
-        const wheelPath2 = new THREE.Shape();
-        wheelPath2.moveTo(x, y);
-        wheelPath2.absarc(x, y, radius, startAngle, endAngle, clockwise);
-        wheelPath2.absarc(x, y, radius, endAngle, startAngle, clockwise);
-        wheelPath2.closePath();
-        const wheelGeometry2 = new THREE.ShapeGeometry(wheelPath2);
-
-        const wheel2 = new THREE.Mesh(wheelGeometry2, wheelMaterial);
-        const wheel = new THREE.Group();
-        wheel.add(wheel1);
-        wheel.add(wheel2);
-
-        scene.add(wheel);
-        wheel.position.set(0, 0, 0);
-
+        // Если персонаж внутри транспортного средства
+        const circleMesh = createCirclePlayer(
+          outlineColor,
+          teams[teamId].color,
+          4,
+          5
+        );
+        const wheelMesh = createWheelPlayer(
+          wheelWidth,
+          wheelHeight,
+          wheelRadius
+        );
         const circle = new THREE.Group();
-        circle.add(mesh1);
-        circle.add(mesh2);
-        circle.add(wheel);
-        circle.name = childName1;
-        circle.lookAt(0, 0, -1);
+        circle.add(circleMesh);
+        circle.add(wheelMesh);
+        circle.name = childNames[0];
         circle.rotateZ(Math.PI);
         scene.add(circle);
         // Обновляем позицию круга
         circle.position.set(
-          player.character.location.x / divider - canvasWidth / 2,
-          player.character.location.y / divider - canvasHeight / 2,
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
           0
         );
       } else {
         // Если персонаж вне транспортного средства, используем другой материал
-        const material1 = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-        const geometry1 = new THREE.CircleGeometry(4, 32);
-        const mesh1 = new THREE.Mesh(geometry1, material1);
-
-        const material2 = new THREE.MeshBasicMaterial({
-          color: "black",
-          side: THREE.DoubleSide,
-        });
-        const geometry2 = new THREE.RingGeometry(4, 5, 32);
-        const mesh2 = new THREE.Mesh(geometry2, material2);
-
-        const circle = new THREE.Group();
-        circle.add(mesh1);
-        circle.add(mesh2);
-        circle.name = childName1;
-        scene.add(circle);
+        const circleMesh = createCirclePlayer(
+          outlineColor,
+          teams[teamId].color,
+          4,
+          5
+        );
+        circleMesh.name = childNames[0];
+        circleMesh.rotateZ(Math.PI);
+        scene.add(circleMesh);
         // Обновляем позицию круга
-        circle.position.set(
-          player.character.location.x / divider - canvasWidth / 2,
-          player.character.location.y / divider - canvasHeight / 2,
+        circleMesh.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
           0
         );
       }
     });
 
-    const filteredPlayerName = logPlayerPositionArray.filter(
+    const filteredPlayersPositionTeam = logPlayerPositionArray.filter(
       (player) =>
         player.character.teamId == targetTeamId &&
         Math.abs(player.eventTimeGet - time) <= timeDelay
     );
 
-    filteredPlayerName.forEach((player) => {
+    filteredPlayersPositionTeam.forEach((player) => {
       const teamId = player.character.teamId;
       const playerIsInVehicle = player.vehicle;
+      const startX = player.character.location.x / divider;
+      const startY = player.character.location.y / divider;
 
       if (playerIsInVehicle != null) {
-        const starShape = new THREE.Shape();
-        const outerRadius = 5;
-        const innerRadius = 2;
-        const numPoints = 5;
-        let startAngle = 90;
-
-        const initialAngleOffset = startAngle * (Math.PI / 180);
-
-        for (let i = 0; i < numPoints * 2; i++) {
-          const angle = (i / numPoints) * Math.PI + initialAngleOffset; // Добавляем смещение угла;
-          const radius = i % 2 === 0 ? outerRadius : innerRadius;
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-          if (i === 0) {
-            starShape.moveTo(x, y);
-          } else {
-            starShape.lineTo(x, y);
-          }
-        }
-        starShape.closePath();
-
-        const starGeometry = new THREE.ShapeGeometry(starShape);
-        const starMaterial = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-        const starMesh = new THREE.Mesh(starGeometry, starMaterial);
-        const outlineMaterial = new THREE.LineBasicMaterial({
-          color: "black",
-          linewidth: 2,
-          side: THREE.DoubleSide,
-        });
-        const outlineGeometry = new THREE.EdgesGeometry(starGeometry);
-        const outlineMesh = new THREE.LineSegments(
-          outlineGeometry,
-          outlineMaterial
+        const outline = createStarPlayer(outlineColor, 3, 6, 5);
+        const star = createStarPlayer(teams[teamId].color, 2, 5, 5);
+        const starMesh = new THREE.Group();
+        starMesh.add(outline);
+        starMesh.add(star);
+        starMesh.scale.set(1.2, 1.2, 0);
+        const wheelMesh = createWheelPlayer(
+          wheelWidth,
+          wheelHeight,
+          wheelRadius
         );
-
-        const star = new THREE.Group();
-        star.add(outlineMesh);
-        star.add(starMesh);
-        star.name = childName1;
-        star.scale.set(1.2, 1.2, 0);
-        scene.add(star);
-
-        const x = 0;
-        const y = 0;
-        const radius = 1.5;
-        startAngle = 0;
-        let endAngle = 180;
-        const longX = 3.5;
-        const longY = 0.5;
-        const clockwise = false;
-        startAngle = startAngle * (Math.PI / 180);
-        endAngle = endAngle * (Math.PI / 180);
-
-        const wheelPath1 = new THREE.Shape();
-        wheelPath1.moveTo(x - longX, y + longY);
-        wheelPath1.lineTo(x + longX, y + longY);
-        wheelPath1.lineTo(x + longX, y - longY);
-        wheelPath1.lineTo(x - longX, y - longY);
-        wheelPath1.lineTo(x - longX, y + longY);
-        wheelPath1.moveTo(x, y);
-        wheelPath1.lineTo(x + longY, y);
-        wheelPath1.lineTo(x + longY, y - longX);
-        wheelPath1.lineTo(x - longY, y - longX);
-        wheelPath1.lineTo(x - longY, y);
-        wheelPath1.lineTo(x, y);
-        wheelPath1.moveTo(x, y);
-        wheelPath1.closePath();
-        const wheelGeometry1 = new THREE.ShapeGeometry(wheelPath1);
-        const wheelMaterial = new THREE.MeshBasicMaterial({
-          color: "black",
-          side: THREE.DoubleSide,
-        });
-        const wheel1 = new THREE.Mesh(wheelGeometry1, wheelMaterial);
-
-        const wheelPath2 = new THREE.Shape();
-        wheelPath2.moveTo(x, y);
-        wheelPath2.absarc(x, y, radius, startAngle, endAngle, clockwise);
-        wheelPath2.absarc(x, y, radius, endAngle, startAngle, clockwise);
-        wheelPath2.closePath();
-        const wheelGeometry2 = new THREE.ShapeGeometry(wheelPath2);
-
-        const wheel2 = new THREE.Mesh(wheelGeometry2, wheelMaterial);
-        const wheel = new THREE.Group();
-        wheel.add(wheel1);
-        wheel.add(wheel2);
-
         const starPlayer = new THREE.Group();
-        starPlayer.add(star);
-        starPlayer.add(wheel);
-        starPlayer.name = childName1;
-        starPlayer.lookAt(0, 0, -1);
+        starPlayer.add(starMesh);
+        starPlayer.add(wheelMesh);
+        starPlayer.name = childNames[0];
         starPlayer.rotateZ(Math.PI);
         scene.add(starPlayer);
         // Обновляем позицию круга
         starPlayer.position.set(
-          player.character.location.x / divider - canvasWidth / 2,
-          player.character.location.y / divider - canvasHeight / 2,
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
           0
         );
       } else {
         // Если персонаж вне транспортного средства, используем другой материал
-        const starShape = new THREE.Shape();
-        const outerRadius = 5;
-        const innerRadius = 2;
-        const numPoints = 5;
-        let startAngle = 90;
-
-        const initialAngleOffset = startAngle * (Math.PI / 180);
-
-        for (let i = 0; i < numPoints * 2; i++) {
-          const angle = (i / numPoints) * Math.PI + initialAngleOffset; // Добавляем смещение угла;
-          const radius = i % 2 === 0 ? outerRadius : innerRadius;
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-          if (i === 0) {
-            starShape.moveTo(x, y);
-          } else {
-            starShape.lineTo(x, y);
-          }
-        }
-        starShape.closePath();
-
-        const starGeometry = new THREE.ShapeGeometry(starShape);
-        const starMaterial = new THREE.MeshBasicMaterial({
-          color: teams[teamId].color,
-          side: THREE.DoubleSide,
-        });
-        const starMesh = new THREE.Mesh(starGeometry, starMaterial);
-        const outlineMaterial = new THREE.LineBasicMaterial({
-          color: "black",
-          linewidth: 2,
-          side: THREE.DoubleSide,
-        });
-        const outlineGeometry = new THREE.EdgesGeometry(starGeometry);
-        const outlineMesh = new THREE.LineSegments(
-          outlineGeometry,
-          outlineMaterial
-        );
-
-        const star = new THREE.Group();
-        star.add(outlineMesh);
-        star.add(starMesh);
-        star.name = childName1;
-        star.lookAt(0, 0, -1);
-        star.rotateZ(Math.PI);
-        star.scale.set(1.2, 1.2, 0);
-        scene.add(star);
+        const outline = createStarPlayer(outlineColor, 3, 6, 5);
+        const star = createStarPlayer(teams[teamId].color, 2, 5, 5);
+        const starPlayer = new THREE.Group();
+        starPlayer.add(outline);
+        starPlayer.add(star);
+        starPlayer.name = childNames[0];
+        starPlayer.rotateZ(Math.PI);
+        starPlayer.scale.set(1.2, 1.2, 0);
+        scene.add(starPlayer);
         // Обновляем позицию круга
-        star.position.set(
-          player.character.location.x / divider - canvasWidth / 2,
-          player.character.location.y / divider - canvasHeight / 2,
+        starPlayer.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
+          0
+        );
+      }
+    });
+    // Рендеринг сцены
+    renderer.render(scene, camera);
+  }
+  //========================================================
+  function drawPlayersGroggy(time) {
+    // Получаем все дочерние объекты сцены
+    const allChildren = scene.children;
+    const childNames = [
+      "groggy_1",
+      "groggy_2",
+      "groggy_3",
+      "groggy_4",
+      "groggy_5",
+    ];
+    allChildren.forEach((child) => {
+      if (childNames.includes(child.name)) {
+        scene.remove(child);
+      }
+    });
+    // const filteredPlayers = logPlayerPositionArray.filter(
+    //   (player) => player.character.name && player.elapsedTime == time
+    // );
+
+    const filteredPlayersGroggyNoTeam = logPlayerMakeGroggyArray.filter(
+      (player) =>
+        player.victim.teamId != targetTeamId &&
+        Math.abs(player.eventTimeGet - time) <= timeDelay
+    );
+
+    filteredPlayersGroggyNoTeam.forEach((player) => {
+      const teamId = player.victim.teamId;
+      const playerIsInVehicle = player.victim.isInVehicle;
+      const startX = player.victim.location.x / divider;
+      const startY = player.victim.location.y / divider;
+
+      if (playerIsInVehicle) {
+        // Если персонаж внутри транспортного средства, используем текстуру
+        const circleMesh = createCirclePlayer(
+          groggyColor,
+          teams[teamId].color,
+          4,
+          5
+        );
+        const wheelMesh = createWheelPlayer(
+          wheelWidth,
+          wheelHeight,
+          wheelRadius
+        );
+        const circle = new THREE.Group();
+        circle.add(circleMesh);
+        circle.add(wheelMesh);
+        circle.name = childNames[0];
+        circle.rotateZ(Math.PI);
+        scene.add(circle);
+        // Обновляем позицию круга
+        circle.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
+          0
+        );
+      } else {
+        // Если персонаж вне транспортного средства, используем другой материал
+        const circle = createCirclePlayer(
+          groggyColor,
+          teams[teamId].color,
+          4,
+          5
+        );
+        circle.name = childNames[0];
+        circle.rotateZ(Math.PI);
+        scene.add(circle);
+        // Обновляем позицию круга
+        circle.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
+          0
+        );
+      }
+    });
+
+    const filteredPlayersGroggyTeam = logPlayerMakeGroggyArray.filter(
+      (player) =>
+        player.victim.teamId == targetTeamId &&
+        Math.abs(player.eventTimeGet - time) <= timeDelay
+    );
+    filteredPlayersGroggyTeam.forEach((player) => {
+      const teamId = player.victim.teamId;
+      const playerIsInVehicle = player.victim.isInVehicle;
+      const startX = player.victim.location.x / divider;
+      const startY = player.victim.location.y / divider;
+
+      if (playerIsInVehicle) {
+        const outline = createStarPlayer(groggyColor, 3, 6, 5);
+        const star = createStarPlayer(teams[teamId].color, 2, 5, 5);
+        const starMesh = new THREE.Group();
+        starMesh.add(outline);
+        starMesh.add(star);
+        starMesh.scale.set(1.2, 1.2, 0);
+        const wheelMesh = createWheelPlayer(
+          wheelWidth,
+          wheelHeight,
+          wheelRadius
+        );
+        const starPlayer = new THREE.Group();
+        starPlayer.add(starMesh);
+        starPlayer.add(wheelMesh);
+        starPlayer.name = childNames[0];
+        starPlayer.rotateZ(Math.PI);
+        scene.add(starPlayer);
+        // Обновляем позицию круга
+        starPlayer.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
+          0
+        );
+      } else {
+        // Если персонаж вне транспортного средства, используем другой материал
+        const outline = createStarPlayer(groggyColor, 3, 6, 5);
+        const star = createStarPlayer(teams[teamId].color, 2, 5, 5);
+        const starPlayer = new THREE.Group();
+        starPlayer.add(outline);
+        starPlayer.add(star);
+        starPlayer.name = childNames[0];
+        starPlayer.rotateZ(Math.PI);
+        starPlayer.scale.set(1.2, 1.2, 0);
+        scene.add(starPlayer);
+        // Обновляем позицию круга
+        starPlayer.position.set(
+          startX - canvasWidth / 2,
+          startY - canvasHeight / 2,
           0
         );
       }
@@ -1594,24 +1617,12 @@ loadMapId.addEventListener("click", async function () {
   function drawZones(time) {
     // Получаем все дочерние объекты сцены
     const allChildren = scene.children;
-    const childName1 = "ringMesh_1";
-    const childName2 = "ringMesh_2";
-    const childName3 = "ringMesh_3";
-
-    // Проходим по всем дочерним объектам
-    for (let i = allChildren.length - 1; i >= 0; i--) {
-      const child = allChildren[i];
-
-      // Проверяем, имеет ли дочерний объект имя "ringMesh_1"
-      if (
-        child.name == childName1 ||
-        child.name == childName2 ||
-        child.name == childName3
-      ) {
-        // Удаляем дочерний объект из сцены
+    const childNames = ["ringMesh_1", "ringMesh_2", "ringMesh_3"];
+    allChildren.forEach((child) => {
+      if (childNames.includes(child.name)) {
         scene.remove(child);
       }
-    }
+    });
 
     const filteredEvents = gameStateDataArray.filter(
       (event) => Math.abs(event.eventTimeGet - time) <= timeDelay
@@ -1628,7 +1639,7 @@ loadMapId.addEventListener("click", async function () {
         side: THREE.DoubleSide,
       });
       let ringMesh1 = new THREE.Mesh(ringGeometry1, ringMaterial1);
-      ringMesh1.name = childName1;
+      ringMesh1.name = childNames[0];
 
       let ringGeometry2 = new THREE.RingGeometry(
         event.safetyZoneRadius / divider,
@@ -1642,7 +1653,7 @@ loadMapId.addEventListener("click", async function () {
         side: THREE.DoubleSide,
       });
       let ringMesh2 = new THREE.Mesh(ringGeometry2, ringMaterial2);
-      ringMesh2.name = childName2;
+      ringMesh2.name = childNames[1];
 
       let ringGeometry3 = new THREE.CircleGeometry(
         event.redZoneRadius / divider,
@@ -1655,7 +1666,7 @@ loadMapId.addEventListener("click", async function () {
         side: THREE.DoubleSide,
       });
       let ringMesh3 = new THREE.Mesh(ringGeometry3, ringMaterial3);
-      ringMesh3.name = childName3;
+      ringMesh3.name = childNames[2];
 
       scene.add(ringMesh1);
       scene.add(ringMesh2);
